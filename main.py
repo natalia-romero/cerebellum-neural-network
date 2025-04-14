@@ -1,6 +1,3 @@
-# --- Cerebellum-inspired KAN con función spline ---
-# Esta versión incluye una implementación funcional de KAN mediante B-splines.
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
