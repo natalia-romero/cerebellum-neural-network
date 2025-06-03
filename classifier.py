@@ -6,13 +6,11 @@ import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 
-# ======= Setup =======
 
 SEED = 42
 torch.manual_seed(SEED)
 random.seed(SEED)
 
-# ======= Definición de la Red =======
 
 class KANFunction(nn.Module):
     def __init__(self, num_basis=12, input_dim=4, output_dim=3):
@@ -48,14 +46,12 @@ class KANNode(nn.Module):
         self.last_input = x.detach()
         out = self.kan_func(x)
 
-        # Homeostasis
         target_mean_activity = 0.2
         current_mean = out.mean().item()
         self.activity_trace = 0.9 * self.activity_trace + 0.1 * current_mean
         correction = self.activity_trace - target_mean_activity
         out = out - 0.1 * correction
 
-        # Inhibición adaptativa
         if self.inhibition:
             inhibition_level = torch.relu(self.last_input).mean().item()
             out = out - 0.1 * inhibition_level
@@ -78,7 +74,6 @@ class KANNode(nn.Module):
 
             expanded_input = basis_stack[0]
 
-            # Error local
             predicted = self.kan_func(self.last_input.unsqueeze(0)).squeeze(0)
             if error_signal is not None:
                 combined_error = error_signal + (predicted - predicted.detach())
@@ -118,7 +113,6 @@ class CerebellarKAN(nn.Module):
             last_cell = self.cells[-1]
             last_cell.apply_plasticity(final_error_signal)
 
-# ======= Funciones Generales =======
 
 def load_dataset(path, input_cols, target_col):
     df = pd.read_excel(path)
