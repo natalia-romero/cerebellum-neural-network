@@ -3,11 +3,14 @@ import pandas as pd
 import numpy as np
 import os
 import glob
+import time
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import classification_report
 import matplotlib.pyplot as plt
-from sklearn.metrics import confusion_matrix, roc_curve, auc, ConfusionMatrixDisplay
+from sklearn.model_selection import StratifiedKFold, cross_val_predict
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import classification_report, confusion_matrix, roc_curve, auc, ConfusionMatrixDisplay, precision_score, recall_score, f1_score
 from core.classifier import CerebellarANNClassifier
 from cells.cell_types import Granule, Purkinje, DeepNuclei, Basket, MossyFiber, ClimbingFiber, Stellate
 
@@ -21,95 +24,87 @@ data_dir = "./demo/MovementAAL/dataset"
 input_files = sorted(glob.glob(os.path.join(data_dir, "MovementAAL_RSS_*.csv")))
 targets_df = pd.read_csv(os.path.join(data_dir, "MovementAAL_target.csv"))
 
+
 X = []
 y = []
-
 for file in input_files:
     seq_id = int(file.split("_")[-1].split(".")[0])
-    sequence = pd.read_csv(file).values 
+    sequence = pd.read_csv(file).values
     try:
         label = targets_df[targets_df["#sequence_ID"] == seq_id][" class_label"].values[0]
     except IndexError:
-        continue  
-
-    X.append(sequence.mean(axis=0))  
+        continue
+    X.append(sequence.mean(axis=0))
     y.append(1 if label == 1 else 0)
 
 X = np.array(X, dtype=np.float32)
 y = np.array(y, dtype=np.float32).reshape(-1, 1)
-
-unique, counts = np.unique(y, return_counts=True)
-print("Class count:", dict(zip(unique, counts)))
+print("Class count:", dict(zip(*np.unique(y, return_counts=True))))
 
 scaler = StandardScaler()
 X = scaler.fit_transform(X)
 
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=SEED)
-X_train = torch.tensor(X_train, dtype=torch.float32).to(DEVICE)
-y_train = torch.tensor(y_train, dtype=torch.float32).to(DEVICE)
-X_test = torch.tensor(X_test, dtype=torch.float32).to(DEVICE)
-y_test = torch.tensor(y_test, dtype=torch.float32).to(DEVICE)
+X_tensor = torch.tensor(X, dtype=torch.float32).to(DEVICE)
+y_tensor = torch.tensor(y, dtype=torch.float32).to(DEVICE)
 
-#model
-model = CerebellarANNClassifier()
-model.add_cell(Purkinje(plasticity='LTD', inhibition=True)) 
-model.add_cell(Granule(plasticity='STDP', inhibition=False))   
-model.finalize() 
-model.to(DEVICE)
+#k-fold
+k = 10
+fold_size = len(X_tensor) // k
+indices = torch.randperm(len(X_tensor), generator=torch.Generator().manual_seed(SEED))
+all_preds = []
+all_targets = []
 
-params = []
-for cell in model.cells:
-    for p in cell.model.parameters():
-        if p.requires_grad:
-            params.append(p)
+start_time = time.time()
+for fold in range(k):
+    print(f"\nFold {fold + 1}/{k}")
 
-optimizer = torch.optim.AdamW(params, lr=0.001)
-loss_fn = torch.nn.BCELoss()
+    val_idx = indices[fold * fold_size:(fold + 1) * fold_size]
+    train_idx = torch.cat((indices[:fold * fold_size], indices[(fold + 1) * fold_size:]))
 
-#train
-print("\nTraining classifier model...")
-for epoch in range(50):
-    total_loss = 0
-    for x, y_true in zip(X_train, y_train):
-        loss = model.train_on_batch(x.unsqueeze(0), y_true.unsqueeze(0), optimizer, loss_fn)
-        total_loss += loss
-    if epoch % 10 == 0 or epoch == 49:
-        print(f"Epoch {epoch + 1}: Loss = {total_loss / len(X_train):.4f}")
+    X_train, y_train = X_tensor[train_idx], y_tensor[train_idx]
+    X_val, y_val = X_tensor[val_idx], y_tensor[val_idx]
 
-#evaluate
+    model = CerebellarANNClassifier(optimizer_class=torch.optim.AdamW, loss_fn=torch.nn.BCELoss(), lr=0.001, epochs=50)
+    model.add_cell(Granule(plasticity='STDP', inhibition=True))
+    model.add_cell(Purkinje(plasticity='LTP', inhibition=True))
+    model.add_cell(DeepNuclei(plasticity='LTP', inhibition=True))
+    model.to(DEVICE)
+    model.fit(X_train, y_train)
 
-y_pred = model.predict(X_test)
-y_true = y_test.cpu().numpy().flatten()
-print("\nClassification Report:")
+    y_pred = model.predict(X_val)
+    all_preds.extend(y_pred)
+    all_targets.extend(y_val.cpu().numpy().flatten())
+
+end_time = time.time()
+
+# Evaluación
+y_true = np.array(all_targets)
+y_pred = np.array(all_preds)
+print("\nClassification Report (10-fold CV):")
 print(classification_report(y_true, y_pred, digits=4))
+print("Total training + evaluation time: {:.2f} seconds".format(end_time - start_time))
 
-
-np.random.seed(42)
-y_true = np.random.randint(0, 2, size=100)
-y_pred = np.random.randint(0, 2, size=100)
-y_scores = np.random.rand(100)  # for ROC curve
-
-# Confusion Matrix
+# Matriz de Confusión
 cm = confusion_matrix(y_true, y_pred)
 disp = ConfusionMatrixDisplay(confusion_matrix=cm)
 disp.plot()
-plt.title("Confusion Matrix")
+plt.title("Confusion Matrix (10-fold CV)")
 plt.grid(False)
 plt.tight_layout()
-plt.savefig("confusion_matrix.png")
+plt.savefig("confusion_matrix_kfold.png")
 plt.close()
 
-# ROC Curve
-fpr, tpr, _ = roc_curve(y_true, y_scores)
+# Curva ROC
+fpr, tpr, _ = roc_curve(y_true, y_pred)
 roc_auc = auc(fpr, tpr)
 
 plt.figure()
 plt.plot(fpr, tpr, label=f"ROC curve (area = {roc_auc:.2f})")
-plt.plot([0, 1], [0, 1], "k--", label="Random chance")
+plt.plot([0, 1], [0, 1], "k--")
 plt.xlabel("False Positive Rate")
 plt.ylabel("True Positive Rate")
-plt.title("ROC Curve")
+plt.title("ROC Curve (10-fold CV)")
 plt.legend(loc="lower right")
 plt.tight_layout()
-plt.savefig("roc_curve.png")
+plt.savefig("roc_curve_kfold.png")
 plt.close()
