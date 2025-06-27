@@ -1,9 +1,9 @@
-from Cerebellar_Class import NeuronaCerebelarKAN
-from core.constants import CELL_NAMES, FEATURES, DATA_DIR
+from core.constants import CELL_NAMES, FEATURES, DATASET_DIR
+from cells.Cerebellar_Class import NeuronaCerebelarKAN
 import os
 
 for name in CELL_NAMES:
-    path_csv = os.path.join(DATA_DIR, f"{name}_light.csv")
+    path_csv = os.path.join(DATASET_DIR, f"{name}_light.csv")
     if os.path.exists(path_csv):
         print(f"\n🚀 Pretraining cell: {name}")
         cell = NeuronaCerebelarKAN(nombre_celula=name, columnas_features=FEATURES)

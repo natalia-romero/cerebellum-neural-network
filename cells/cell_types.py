@@ -5,13 +5,16 @@ class Granule(CerebellarCell):
         super().__init__('granule_lif', plasticity, inhibition, adaptive)
 
 class Purkinje(CerebellarCell):
-    def __init__(self, plasticity='STDP', inhibition=False, adaptive=False):
+    def __init__(self, plasticity='LTP', inhibition=False, adaptive=False):
         super().__init__('purkinje_hh_dinamico', plasticity, inhibition, adaptive)
 
 class DeepNuclei(CerebellarCell):
-    def __init__(self, plasticity='STDP', inhibition=False, adaptive=False):
+    def __init__(self, plasticity='LTP', inhibition=False, adaptive=False):
         super().__init__('deep_nuclei_lif', plasticity, inhibition, adaptive)
 
+class MossyFiber(CerebellarCell):
+    def __init__(self, plasticity='LTP', inhibition=False, adaptive=False):
+        super().__init__('mossy_fiber', plasticity, inhibition, adaptive)
 class Stellate(CerebellarCell):
     def __init__(self, plasticity='STDP', inhibition=False, adaptive=False):
         super().__init__('stellate_lif', plasticity, inhibition, adaptive)

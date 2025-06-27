@@ -1,7 +1,7 @@
 # constants.py
 
 # Default features used by all cells
-DEFAULT_FEATURES = ["time_ms", "voltage_mV", "input_current_nA"]
+FEATURES = ["time_ms", "voltage_mV", "input_current_nA"]
 
 # Folder where data CSVs live
 DATASET_DIR = "dataset_cerebelo"

@@ -4,42 +4,43 @@ import torch.nn as nn
 class CerebellarANNClassifier(nn.Module):
     def __init__(self):
         super().__init__()
-        self.cells = nn.ModuleList()
+        self.cells = []
+        self.linear = None  # Se define en finalize()
 
     def add_cell(self, cell):
         self.cells.append(cell)
 
-    def forward(self, x):
-        self.intermediate_outputs = []
+    def finalize(self):
+        # Pasar dummy input por la red para inicializar last_output
+        with torch.no_grad():
+            dummy_input = torch.zeros(1, self.cells[0].input_dim)
+            out = self.forward_internal(dummy_input)
+        
+        output_dim = out.shape[1]
+        print("✅ Red finalizada. output_dim =", output_dim)
+        self.linear = nn.Linear(output_dim, 1)
+
+
+    def forward_internal(self, x):
         for cell in self.cells:
             x = cell(x)
-            self.intermediate_outputs.append(x)
         return x
 
-    def apply_plasticity(self, error_signal):
-        if self.cells:
-            self.cells[-1].apply_plasticity(error_signal)
+    def forward(self, x):
+        x = self.forward_internal(x)
+        return self.linear(x)
 
     def train_on_batch(self, x, y_true, optimizer, loss_fn):
+        self.train()
+        optimizer.zero_grad()
         y_pred = torch.sigmoid(self.forward(x))
         loss = loss_fn(y_pred, y_true)
-        optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        error_signal = (y_true - y_pred).squeeze(0).detach()
-        self.apply_plasticity(error_signal)
         return loss.item()
 
-    def predict_proba(self, X):
+    def predict(self, x):
         self.eval()
-        probabilities = []
         with torch.no_grad():
-            for x in X:
-                x = x.unsqueeze(0)
-                y_pred = torch.sigmoid(self.forward(x)).item()
-                probabilities.append(y_pred)
-        return probabilities
-
-    def predict(self, X, threshold=0.5):
-        probabilities = self.predict_proba(X)
-        return [int(p > threshold) for p in probabilities]
+            preds = torch.sigmoid(self.forward(x))
+        return (preds > 0.5).int().cpu().numpy().flatten()
