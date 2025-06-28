@@ -1,0 +1,17 @@
+Avg metrics per 10-Fold CV:
+ACC: 0.6935 - 0.2047
+PREC: 0.6757 - 0.3004
+REC: 0.7400 - 0.1798
+F1: 0.6501 - 0.2117
+
+Classification Report:
+              precision    recall  f1-score   support
+
+           0     0.6993    0.6579    0.6780       152
+           1     0.6886    0.7278    0.7077       158
+
+    accuracy                         0.6935       310
+   macro avg     0.6940    0.6929    0.6928       310
+weighted avg     0.6939    0.6935    0.6931       310
+
+Total Training Time: 138.22 seconds

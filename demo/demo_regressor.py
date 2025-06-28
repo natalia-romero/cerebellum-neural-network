@@ -4,10 +4,9 @@ import numpy as np
 import os
 import glob
 import matplotlib.pyplot as plt
+import time
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import mean_squared_error, r2_score
-
 from core.regressor import CerebellarANNRegressor
 from cells.cell_types import Granule, Purkinje, DeepNuclei, Basket, MossyFiber, ClimbingFiber, Stellate
 
@@ -33,7 +32,7 @@ for walk_dir in walk_dirs:
             X.append(features.values)
             y.append(target)
         except Exception as e:
-            print(f"⚠️ Error con archivo {file}: {e}")
+            print(f"File error {file}: {e}")
             continue
 
 X = np.array(X, dtype=np.float32)
@@ -44,53 +43,43 @@ scaler_y = StandardScaler()
 X = scaler_X.fit_transform(X)
 y = scaler_y.fit_transform(y)
 
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=SEED)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=SEED)
 X_train = torch.tensor(X_train, dtype=torch.float32).to(DEVICE)
 y_train = torch.tensor(y_train, dtype=torch.float32).to(DEVICE)
 X_test = torch.tensor(X_test, dtype=torch.float32).to(DEVICE)
 y_test = torch.tensor(y_test, dtype=torch.float32).to(DEVICE)
 
-#model
+# Build model
 model = CerebellarANNRegressor()
-model.add_cell(Purkinje(plasticity='LTD'))  
+model.add_cell(Granule(plasticity='STDP', inhibition=True))
+model.add_cell(Purkinje(plasticity='LTP', inhibition=False))
+model.add_cell(DeepNuclei(plasticity='LTD', inhibition=True))
 model.finalize()
 model.to(DEVICE)
 
-params = []
-for cell in model.cells:
-    for p in cell.model.parameters():
-        if p.requires_grad:
-            params.append(p)
-
-optimizer = torch.optim.AdamW(params, lr=0.01)
+optimizer = torch.optim.AdamW(model.get_trainable_parameters(), lr=0.001)
 loss_fn = torch.nn.MSELoss()
 
-#train
-print("\nTraining regressor model...")
-for epoch in range(1, 101):
-    loss = model.train_on_batch(X_train, y_train, optimizer, loss_fn)
-    if epoch % 10 == 1 or epoch == 100:
-        print(f"Epoch {epoch}: Loss = {loss:.4f}")
+# Train
+print("\nTraining model...")
+start_time = time.time()
+losses = model.fit(X_train, y_train, optimizer, loss_fn, epochs=100)
+training_time = time.time() - start_time
+print(f"Training time: {training_time:.2f} seconds")
 
-#evaluation
-model.eval()
-with torch.no_grad():
-    y_pred = model.predict(X_test)
-    y_pred_inv = scaler_y.inverse_transform(y_pred.reshape(-1, 1))
-    y_test_inv = scaler_y.inverse_transform(y_test.cpu().numpy().reshape(-1, 1))
-
-mse = mean_squared_error(y_test_inv, y_pred_inv)
-r2 = r2_score(y_test_inv, y_pred_inv)
-print("\nEvaluation:")
-print("MSE:", round(mse, 4))
-print("R² :", round(r2, 4))
-plt.figure(figsize=(10, 6))
-plt.plot(y_test_inv, label="Ground Truth", marker='o')
-plt.plot(y_pred_inv, label="Prediction", marker='x')
-plt.title("CINN Regression - MotionSense Dataset")
-plt.xlabel("Sample Index")
-plt.ylabel("Target Value (e.g., mean acc x-axis)")
-plt.legend()
+plt.figure()
+plt.plot(range(1, len(losses)+1), losses, marker='o')
+plt.title("Training Loss Curve")
+plt.xlabel("Epoch")
+plt.ylabel("Loss")
 plt.grid(True)
 plt.tight_layout()
-plt.savefig("motion_regression_plot.png")  
+os.makedirs("results_regression", exist_ok=True)
+plt.savefig("results_regression/loss_curve.png")
+plt.close()
+
+
+#eva
+model.evaluate(X_test, y_test, scaler_y=scaler_y, return_predictions=True)
+
+print(f"Training time: {training_time} seconds\n")
