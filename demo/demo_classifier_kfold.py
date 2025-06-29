@@ -9,7 +9,7 @@ from sklearn.metrics import classification_report, precision_score, recall_score
 from matplotlib import pyplot as plt
 from sklearn.metrics import ConfusionMatrixDisplay, roc_curve, auc
 
-from core.classifier import CerebellarANNClassifier
+from core.classifier import CINNClassifier
 from cells.cell_types import Granule, Purkinje, DeepNuclei
 
 SEED = 42
@@ -64,7 +64,7 @@ for fold in range(FOLDS):
     X_val_tensor = torch.tensor(X_val, dtype=torch.float32).to(DEVICE)
     y_val_tensor = torch.tensor(y_val, dtype=torch.float32).to(DEVICE)
 
-    model = CerebellarANNClassifier()
+    model = CINNClassifier()
     model.add_cell(Granule(plasticity='STDP', inhibition=True))
     model.add_cell(Purkinje(plasticity='LTP', inhibition=False))
     model.add_cell(DeepNuclei(plasticity='LTD', inhibition=True))

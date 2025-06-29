@@ -3,7 +3,7 @@ import torch.nn as nn
 from sklearn.metrics import classification_report, confusion_matrix, roc_curve, auc, ConfusionMatrixDisplay
 import matplotlib.pyplot as plt
 
-class CerebellarANNClassifier(nn.Module):
+class CINNClassifier(nn.Module):
     def __init__(self):
         super().__init__()
         self.cells = []

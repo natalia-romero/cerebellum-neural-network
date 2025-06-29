@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from sklearn.metrics import mean_squared_error, r2_score
 
-class CerebellarANNRegressor(nn.Module):
+class CINNRegressor(nn.Module):
     def __init__(self):
         super().__init__()
         self.cells = []

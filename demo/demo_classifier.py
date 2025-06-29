@@ -6,7 +6,7 @@ import glob
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
-from core.classifier import CerebellarANNClassifier
+from core.classifier import CINNClassifier
 from cells.cell_types import Granule, Purkinje, DeepNuclei, Basket, MossyFiber, ClimbingFiber, Stellate
 
 SEED = 42
@@ -42,7 +42,7 @@ X_test = torch.tensor(X_test, dtype=torch.float32).to(DEVICE)
 y_test = torch.tensor(y_test, dtype=torch.float32).to(DEVICE)
 
 # Build model
-model = CerebellarANNClassifier()
+model = CINNClassifier()
 model.add_cell(Granule(plasticity='STDP', inhibition=True))
 model.add_cell(Purkinje(plasticity='LTP', inhibition=False))
 model.add_cell(DeepNuclei(plasticity='LTD', inhibition=True))
